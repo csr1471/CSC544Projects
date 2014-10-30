@@ -1,4 +1,4 @@
-import socket, sys
+import socket, sys, time
 import cPickle as pickle
 from os import listdir
 
@@ -29,6 +29,8 @@ def iPyleServer(HOST):
     sc, sa = s.accept()
     print 'connected to {} on port {}'.format(sc.getpeername()[0], PORT)
 
+    
+
     # Initial Sync
     server_files = [f for f in listdir(dir_name) if f[0]!='.']
     print 'Receiving client file list...',
@@ -57,6 +59,48 @@ def iPyleServer(HOST):
         for f in to_add_client:
             send_all(sc, formatFile(f))
         print 'done.'
+    print 'Initial sync complete!'
+
+    
+
+    # Server continuous sync loop
+    server_before = client_before = [f for f in listdir(dir_name) if f[0]!='.']
+
+    while (True):
+        time.sleep(5)
+        server_after = [f for f in listdir(dir_name) if f[0]!='.']
+        print 'Receiving client updates...',
+        length = recv_all(sc, SIZE_BUFF)
+        client_after = pickle.loads(recv_all(sc, int(length)))
+        print 'done.'
+
+        server_additions = [f for f in server_after if not f in server_before]
+        client_additions = [f for f in client_after if not f in client_before]
+
+        send_all(sc, client_additions)
+
+        if client_additions:
+            print 'Receiving files from server...',
+            for f in client_additions:
+                length = recv_all(sc, SIZE_BUFF)
+                recv_file = pickle.loads(recv_all(sc, int(length)))
+                with open('{}/{}'.format(dir_name, recv_file['name']), 'w') as f:
+                    f.write(recv_file['content'])
+            print 'done.'
+
+        send_all(sc, server_additions)
+        
+        if server_additions:
+            print 'Sending files to client...',
+            for f in server_additions:
+                send_all(sc, formatFile(f))
+            print 'done.'
+
+        print 'Refreshing folder lists...',
+        server_before = [f for f in listdir(dir_name) if f[0]!='.']
+        length = recv_all(sc, SIZE_BUFF)
+        client_before = pickle.loads(recv_all(sc, int(length)))
+        print 'done.'
 
     sc.close()
     print 'Connection closed.'
@@ -69,7 +113,9 @@ def iPyleClient(HOST):
     print 'Establishing a connection...',
     s.connect((HOST, PORT))
     print 'connected to {} on port {}'.format(HOST, s.getsockname()[1])
-    
+
+
+    # Initial Sync    
     print 'Sending client file list...',
     client_files = [f for f in listdir(dir_name) if f[0]!='.']
     send_all(s, client_files)
@@ -93,6 +139,42 @@ def iPyleClient(HOST):
             recv_file = pickle.loads(recv_all(s, int(length)))
             with open('{}/{}'.format(dir_name, recv_file['name']), 'w') as f:
                 f.write(recv_file['content'])
+        print 'done.'
+    print 'Initial sync complete!'
+
+    
+
+    # Server continuous sync loop
+    while (True):
+        time.sleep(5)
+        print 'Sending client updates...',
+        client_after = [f for f in listdir(dir_name) if f[0]!='.']
+        send_all(s, client_after)
+        print 'done.'
+
+        length = recv_all(s, SIZE_BUFF)
+        client_additions = pickle.loads(recv_all(s, int(length)))
+        if client_additions:
+            print 'Sending files to server...',
+            for f in client_additions:
+                send_all(s, formatFile(f))
+            print 'done.'
+
+        length = recv_all(s, SIZE_BUFF)
+        server_additions = pickle.loads(recv_all(s, int(length)))
+
+        if server_additions:
+            print 'Receiving files from server...',
+            for f in server_additions:
+                length = recv_all(s, SIZE_BUFF)
+                recv_file = pickle.loads(recv_all(s, int(length)))
+                with open('{}/{}'.format(dir_name, recv_file['name']), 'w') as f:
+                    f.write(recv_file['content'])
+            print 'done.'
+
+        print 'Sending updated client list...',
+        client_before = [f for f in listdir(dir_name) if f[0]!='.']
+        send_all(s, client_before)
         print 'done.'
     
     s.close()
