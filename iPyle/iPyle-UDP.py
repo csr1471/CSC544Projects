@@ -1,6 +1,7 @@
 import socket, sys, time
 import cPickle as pickle
 from os import listdir, remove, path, walk, mkdir, rmdir
+from random import randint
 
 s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 PORT = 12345
@@ -26,6 +27,7 @@ def iPyleServer(HOST):
     server_dirs = ['{}/{}'.format(sync_dir, f) for f in [dir_name for dir_path, dir_name, file_name in walk(path.expanduser(sync_dir)) if dir_name][0]]
     client_dirs, client_addr = s.recvfrom(MAX)
     s.sendto('1', client_addr)
+
     client_dirs = pickle.loads(client_dirs)
 
     to_add_server_dirs = [f for f in client_dirs if not f in server_dirs]
@@ -100,10 +102,14 @@ def iPyleServer(HOST):
             if client_additions_files:
                 for f in client_additions_files:
                     recv_file, client_addr = s.recvfrom(MAX)
-                    s.sendto('1', client_addr)
-                    recv_file = pickle.loads(recv_file)
-                    with open(recv_file['name'], 'w') as f:
-                        f.write(recv_file['content'])
+                    if randint(0, 1):
+                        s.sendto('1', client_addr)
+                        recv_file = pickle.loads(recv_file)
+                        with open(recv_file['name'], 'w') as f:
+                            f.write(recv_file['content'])
+                    else:
+                        s.sendto('1', client_addr)
+                        print 'Unable to sync {} at this time.'.format(recv_file['name'])
 
             send_to(s, pickle.dumps(server_additions_files), client_addr)
             
@@ -203,11 +209,15 @@ def iPyleClient(HOST):
             send_to(s, pickle.dumps(client_after_files), server_addr)
 
             server_additions_dirs, server_addr = s.recvfrom(MAX)
-            s.sendto('1', server_addr)
-            server_additions_dirs = pickle.loads(server_additions_dirs)
-            if server_additions_dirs:
-                for d in server_additions_dirs:
-                    mkdir(d)
+            if randint(0, 1):
+                s.sendto('1', server_addr)
+                server_additions_dirs = pickle.loads(server_additions_dirs)
+                if server_additions_dirs:
+                    for d in server_additions_dirs:
+                        mkdir(d)
+            else:
+                s.sendto('1', server_addr)
+                print 'Unable to add folders to client at this time.'
 
             client_additions_files, server_addr = s.recvfrom(MAX)
             s.sendto('1', server_addr)
@@ -223,10 +233,14 @@ def iPyleClient(HOST):
             if server_additions_files:
                 for f in server_additions_files:
                     recv_file, server_addr = s.recvfrom(MAX)
-                    s.sendto('1', server_addr)
-                    recv_file = pickle.loads(recv_file)
-                    with open(recv_file['name'], 'w') as f:
-                        f.write(recv_file['content'])
+                    if randint(0, 1):
+                        s.sendto('1', server_addr)
+                        recv_file = pickle.loads(recv_file)
+                        with open(recv_file['name'], 'w') as f:
+                            f.write(recv_file['content'])
+                    else:
+                        s.sendto('1', server_addr)
+                        print 'Unable to sync {} at this time.'.format(recv_file['name'])
 
             # Process Removals
             server_removals_files, server_addr = s.recvfrom(MAX)
@@ -276,8 +290,8 @@ def send_to(sock, data, addr):
             data, sender_addr = sock.recvfrom(1)
         except socket.timeout:
             delay *= 2
-            if delay > 5.0:
-                raise RuntimeError('Poor connection. Try again later.')
+            if delay > 10.0:
+                print 'Unable to sync at this time. Try again later.'
         except:
             raise
         else:
