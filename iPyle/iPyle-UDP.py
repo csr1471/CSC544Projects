@@ -27,8 +27,11 @@ def iPyleServer(HOST):
     server_dirs = ['{}/{}'.format(sync_dir, f) for f in [dir_name for dir_path, dir_name, file_name in walk(path.expanduser(sync_dir)) if dir_name][0]]
     client_dirs, client_addr = s.recvfrom(MAX)
 <<<<<<< HEAD
+<<<<<<< HEAD
     s.sendto('1', client_addr)
 
+=======
+>>>>>>> parent of 6683fa5... iPyle-UDP 1.1
 =======
 >>>>>>> parent of 6683fa5... iPyle-UDP 1.1
     client_dirs = pickle.loads(client_dirs)
@@ -103,6 +106,7 @@ def iPyleServer(HOST):
                 for f in client_additions_files:
                     recv_file, client_addr = s.recvfrom(MAX)
 <<<<<<< HEAD
+<<<<<<< HEAD
                     if randint(0, 1):
                         s.sendto('1', client_addr)
                         recv_file = pickle.loads(recv_file)
@@ -112,6 +116,8 @@ def iPyleServer(HOST):
                         s.sendto('1', client_addr)
                         print 'Unable to sync {} at this time.'.format(recv_file['name'])
 =======
+=======
+>>>>>>> parent of 6683fa5... iPyle-UDP 1.1
                     recv_file = pickle.loads(recv_file)
                     with open(recv_file['name'], 'w') as f:
                         f.write(recv_file['content'])
@@ -210,6 +216,7 @@ def iPyleClient(HOST):
 
             server_additions_dirs, server_addr = s.recvfrom(MAX)
 <<<<<<< HEAD
+<<<<<<< HEAD
             if randint(0, 1):
                 s.sendto('1', server_addr)
                 server_additions_dirs = pickle.loads(server_additions_dirs)
@@ -220,6 +227,8 @@ def iPyleClient(HOST):
                 s.sendto('1', server_addr)
                 print 'Unable to add folders to client at this time.'
 =======
+=======
+>>>>>>> parent of 6683fa5... iPyle-UDP 1.1
             server_additions_dirs = pickle.loads(server_additions_dirs)
             if server_additions_dirs:
                 for d in server_additions_dirs:
@@ -239,6 +248,7 @@ def iPyleClient(HOST):
                 for f in server_additions_files:
                     recv_file, server_addr = s.recvfrom(MAX)
 <<<<<<< HEAD
+<<<<<<< HEAD
                     if randint(0, 1):
                         s.sendto('1', server_addr)
                         recv_file = pickle.loads(recv_file)
@@ -248,6 +258,8 @@ def iPyleClient(HOST):
                         s.sendto('1', server_addr)
                         print 'Unable to sync {} at this time.'.format(recv_file['name'])
 =======
+=======
+>>>>>>> parent of 6683fa5... iPyle-UDP 1.1
                     recv_file = pickle.loads(recv_file)
                     with open(recv_file['name'], 'w') as f:
                         f.write(recv_file['content'])
@@ -291,6 +303,7 @@ def formatFile(file_name):
     return file_data
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 def send_to(sock, data, addr):
     delay = 0.1
     while (True):
@@ -306,6 +319,8 @@ def send_to(sock, data, addr):
             raise
         else:
             break
+=======
+>>>>>>> parent of 6683fa5... iPyle-UDP 1.1
 =======
 >>>>>>> parent of 6683fa5... iPyle-UDP 1.1
 if __name__ == '__main__':
