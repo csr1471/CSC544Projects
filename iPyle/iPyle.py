@@ -1,6 +1,6 @@
 import socket, sys, time
 import cPickle as pickle
-from os import listdir
+from os import listdir, remove
 
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 PORT = 12345
@@ -66,41 +66,60 @@ def iPyleServer(HOST):
     # Server continuous sync loop
     server_before = client_before = [f for f in listdir(dir_name) if f[0]!='.']
 
-    while (True):
-        time.sleep(5)
-        server_after = [f for f in listdir(dir_name) if f[0]!='.']
-        print 'Receiving client updates...',
-        length = recv_all(sc, SIZE_BUFF)
-        client_after = pickle.loads(recv_all(sc, int(length)))
-        print 'done.'
-
-        server_additions = [f for f in server_after if not f in server_before]
-        client_additions = [f for f in client_after if not f in client_before]
-
-        send_all(sc, client_additions)
-
-        if client_additions:
-            print 'Receiving files from server...',
-            for f in client_additions:
-                length = recv_all(sc, SIZE_BUFF)
-                recv_file = pickle.loads(recv_all(sc, int(length)))
-                with open('{}/{}'.format(dir_name, recv_file['name']), 'w') as f:
-                    f.write(recv_file['content'])
+    try:
+        while (True):
+            time.sleep(5)
+            server_after = [f for f in listdir(dir_name) if f[0]!='.']
+            print 'Receiving client updates...',
+            length = recv_all(sc, SIZE_BUFF)
+            client_after = pickle.loads(recv_all(sc, int(length)))
             print 'done.'
 
-        send_all(sc, server_additions)
-        
-        if server_additions:
-            print 'Sending files to client...',
-            for f in server_additions:
-                send_all(sc, formatFile(f))
-            print 'done.'
+            
+            # Process Additions
+            server_additions = [f for f in server_after if not f in server_before]
+            client_additions = [f for f in client_after if not f in client_before]
 
-        print 'Refreshing folder lists...',
-        server_before = [f for f in listdir(dir_name) if f[0]!='.']
-        length = recv_all(sc, SIZE_BUFF)
-        client_before = pickle.loads(recv_all(sc, int(length)))
-        print 'done.'
+            send_all(sc, client_additions)
+
+            if client_additions:
+                print 'Receiving files from client...',
+                for f in client_additions:
+                    length = recv_all(sc, SIZE_BUFF)
+                    recv_file = pickle.loads(recv_all(sc, int(length)))
+                    with open('{}/{}'.format(dir_name, recv_file['name']), 'w') as f:
+                        f.write(recv_file['content'])
+                print 'done.'
+
+            send_all(sc, server_additions)
+            
+            if server_additions:
+                print 'Sending files to client...',
+                for f in server_additions:
+                    send_all(sc, formatFile(f))
+                print 'done.'
+
+
+            # Process Removals
+            server_removals = [f for f in server_before if not f in server_after]
+            client_removals = [f for f in client_before if not f in client_after]
+
+            if client_removals:
+                print 'Removing files from server...',
+                for f in client_removals:
+                    file_path = '{}\{}'.format(dir_name, f)
+                    remove(file_path)
+                print 'done.'
+
+            send_all(sc, server_removals)
+
+            print 'Refreshing folder lists...',
+            server_before = [f for f in listdir(dir_name) if f[0]!='.']
+            length = recv_all(sc, SIZE_BUFF)
+            client_before = pickle.loads(recv_all(sc, int(length)))
+            print 'done.'
+    except (KeyboardInterrupt, socket.error):
+        pass
 
     sc.close()
     print 'Connection closed.'
@@ -145,37 +164,55 @@ def iPyleClient(HOST):
     
 
     # Server continuous sync loop
-    while (True):
-        time.sleep(5)
-        print 'Sending client updates...',
-        client_after = [f for f in listdir(dir_name) if f[0]!='.']
-        send_all(s, client_after)
-        print 'done.'
+    try:
+        while (True):
+            time.sleep(5)
 
-        length = recv_all(s, SIZE_BUFF)
-        client_additions = pickle.loads(recv_all(s, int(length)))
-        if client_additions:
-            print 'Sending files to server...',
-            for f in client_additions:
-                send_all(s, formatFile(f))
+            # Process Additions
+            print 'Sending client updates...',
+            client_after = [f for f in listdir(dir_name) if f[0]!='.']
+            send_all(s, client_after)
             print 'done.'
 
-        length = recv_all(s, SIZE_BUFF)
-        server_additions = pickle.loads(recv_all(s, int(length)))
+            length = recv_all(s, SIZE_BUFF)
+            client_additions = pickle.loads(recv_all(s, int(length)))
+            if client_additions:
+                print 'Sending files to server...',
+                for f in client_additions:
+                    send_all(s, formatFile(f))
+                print 'done.'
 
-        if server_additions:
-            print 'Receiving files from server...',
-            for f in server_additions:
-                length = recv_all(s, SIZE_BUFF)
-                recv_file = pickle.loads(recv_all(s, int(length)))
-                with open('{}/{}'.format(dir_name, recv_file['name']), 'w') as f:
-                    f.write(recv_file['content'])
+            length = recv_all(s, SIZE_BUFF)
+            server_additions = pickle.loads(recv_all(s, int(length)))
+
+            if server_additions:
+                print 'Receiving files from server...',
+                for f in server_additions:
+                    length = recv_all(s, SIZE_BUFF)
+                    recv_file = pickle.loads(recv_all(s, int(length)))
+                    with open('{}/{}'.format(dir_name, recv_file['name']), 'w') as f:
+                        f.write(recv_file['content'])
+                print 'done.'
+
+            # Process Removals
+            length = recv_all(s, SIZE_BUFF)            
+            server_removals = pickle.loads(recv_all(s, int(length)))
+
+            if server_removals:
+                print 'Removing files from client...',
+                for f in server_removals:
+                    file_path = '{}\{}'.format(dir_name, f)
+                    remove(file_path)
+                print 'done.'
+
+
+            print 'Sending updated client list...',
+            client_before = [f for f in listdir(dir_name) if f[0]!='.']
+            send_all(s, client_before)
             print 'done.'
-
-        print 'Sending updated client list...',
-        client_before = [f for f in listdir(dir_name) if f[0]!='.']
-        send_all(s, client_before)
-        print 'done.'
+    except (KeyboardInterrupt, socket.error):
+        pass
+        
     
     s.close()
     print 'Connection closed.'
